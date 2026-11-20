@@ -4,9 +4,10 @@ import {drawAtlas, drawEdge} from './plots.js';
 const byId = id => document.getElementById(id);
 const form = byId('run-form');
 const sign = byId('signature-form');
+const migration = byId('migration-form');
 const links = [...document.querySelectorAll('[data-section]')];
 const state = {snapshot: null, catalog: null, preview: null, section: null, selected: null, edgeId: null,
-  busy: false, signing: false, previewToken: 0, reused: false};
+  busy: false, signing: false, previewToken: 0, reused: false, recheck: null, sources: [], rechecking: false};
 const formatTime = new Intl.DateTimeFormat('zh-CN', {timeZone: 'Asia/Shanghai', dateStyle: 'medium', timeStyle: 'medium'});
 const sides = {N: '北', E: '东', S: '南', W: '西'};
 
@@ -112,10 +113,47 @@ function renderDetail() {
     else link.removeAttribute('aria-current');
   }
   byId('detail-title').textContent = links.find(link => link.dataset.section === state.section).textContent.trim().replace(/^\d+/, '');
-  byId('detail-meta').textContent = state.snapshot ? (state.selected ? `图版 ${state.selected}` : '全册') : '档件预检';
+  byId('detail-meta').textContent = state.section === 'migration'
+    ? (state.recheck ? `复核 ${state.recheck.recheck_id.slice(0, 12)}` : '旧批次复核')
+    : state.snapshot ? (state.selected ? `图版 ${state.selected}` : '全册') : '档件预检';
   const limit = state.snapshot?.manifest.parameters.control_limit_m || parameters().control_limit_m;
   renderLedger(byId('detail-content'), state.section, {...state, limit});
   renderSign();
+}
+
+function renderMigration() {
+  migration.hidden = state.section !== 'migration';
+  if (migration.hidden) return;
+  const select = byId('migration-source');
+  const chosen = select.value;
+  select.replaceChildren(...state.sources.map(source => new Option(
+    `${source.kind === 'archive' ? '归档' : '批次'} · ${source.title || source.id} · ${source.rule_version}${source.needs_recheck ? ' · 需复算' : ' · 同规'}`,
+    `${source.kind}:${source.id}`)));
+  if (state.sources.some(source => `${source.kind}:${source.id}` === chosen)) select.value = chosen;
+  if (!state.sources.length) {
+    select.replaceChildren(new Option('没有可复核的旧批次', ''));
+    select.disabled = true;
+  } else {
+    select.disabled = false;
+  }
+  const exportLink = byId('migration-export');
+  if (state.recheck) {
+    exportLink.href = `/api/review/rechecks/${state.recheck.recheck_id}/export`;
+    exportLink.removeAttribute('aria-disabled');
+  } else {
+    exportLink.removeAttribute('href');
+    exportLink.setAttribute('aria-disabled', 'true');
+  }
+}
+
+async function loadSources() {
+  try {
+    const result = await request('/api/review/migration/sources');
+    state.sources = result.sources;
+  } catch {
+    state.sources = [];
+  }
+  if (state.section === 'migration') renderMigration();
 }
 
 function showSnapshot(snapshot) {
@@ -166,9 +204,15 @@ async function selectSection(section, focus = false) {
   state.preview = null;
   const token = ++state.previewToken;
   feedback('signature-error', null);
+  feedback('migration-error', null);
   renderDetail();
+  renderMigration();
   if (focus) byId('detail-title').focus({preventScroll: true});
   if (focus) byId('section-detail').scrollIntoView({block: 'start'});
+  if (section === 'migration') {
+    await loadSources();
+    return;
+  }
   if (state.snapshot || section === 'review' || !form.reportValidity()) return;
   byId('detail-content').replaceChildren(el('p', '正在校验该章节。'));
   try {
@@ -226,6 +270,39 @@ sign.addEventListener('submit', async event => {
   }
 });
 
+migration.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (state.rechecking) return;
+  const value = byId('migration-source').value;
+  if (!value) return;
+  state.rechecking = true;
+  const button = migration.querySelector('button');
+  button.disabled = true;
+  feedback('migration-error', null);
+  byId('run-state').textContent = '正在按现规则复算旧批次…';
+  try {
+    const [source_kind, ...rest] = value.split(':');
+    const document = await post('/api/review/migration/rechecks', {source_kind, source_id: rest.join(':')});
+    state.recheck = document;
+    byId('run-state').textContent = `${document.recheck_id.slice(0, 12)} · 复核册已生成${document.reused ? '（复用同册）' : ''}`;
+    renderDetail();
+    renderMigration();
+  } catch (error) {
+    feedback('migration-error', error.message);
+    byId('run-state').textContent = '复核失败 · 可重试';
+  } finally {
+    state.rechecking = false;
+    button.disabled = false;
+  }
+});
+
+byId('migration-source').addEventListener('change', () => {
+  state.recheck = null;
+  feedback('migration-error', null);
+  renderDetail();
+  renderMigration();
+});
+
 for (const link of links) link.addEventListener('click', event => {
   event.preventDefault();
   history.replaceState(null, '', link.hash);
@@ -261,7 +338,7 @@ form.addEventListener('change', () => {
   if (!state.snapshot) {
     feedback('run-error', null);
     readIndex();
-    if (state.section) selectSection(state.section);
+    if (state.section && state.section !== 'migration') selectSection(state.section);
   }
 });
 byId('print').addEventListener('click', () => window.print());

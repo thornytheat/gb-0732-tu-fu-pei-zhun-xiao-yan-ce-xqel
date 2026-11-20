@@ -34,3 +34,13 @@
 控制点原件＝采信＋离群＋隔离；地面点＝已配对＋隔离；见证点＝可用＋隔离。「可用」指行级证据通过检查，整条边还需模型、覆盖和次序。三张账均核对原件行号多重集。批次键由四份原件 SHA-256、参数和规则版本生成。SQLite 只提交验证完成的整份快照，证据包带输入摘要、创建时间、耗时和签审。
 
 每个档件最多 1 MB，不接收在线上传。未模拟椭球高、其他基准转换或栅格重采样。页面默认保留当前操作会话，重开后可用相同参数取回原批次。签审属于单机档案记录，不提供身份认证或审批流。
+
+## 规则迁移复核
+
+旧批次指先前以另一规则版本留存的正式批次，来源可为库内 `runs`（`source_kind=run`）或 `sample_data/legacy/<id>.json` 归档（`source_kind=archive`）。复核沿用旧批次参数按现行规则重新解码、配对、拟合、重估与验缝，不写回原件，不改动原批次快照与签审。
+
+每幅并列「旧结论」「新口径复算」与「对照」：状态和原因都相同为 `AGREE`，任一改变为 `CHANGED`，无法取得原件或旧结论缺失为 `UNVERIFIABLE`。原签审按 `CURRENT`／`STALE`／`INVALIDATED`／`ABSENT` 登记：现规则签审为 `CURRENT`；旧规签审在复算仍可签时为 `STALE`（须补签），复算已不可签时为 `INVALIDATED`；该幅原本无签审为 `ABSENT`。
+
+「可重验依据」逐项列原件摘要、控制点源行、重估模型、拼缝见证、三表对账和原签审，每项标明取自旧证据（`archived`）还是新复算（`recomputed`）。「待补」单列：`SIGNATURE_STALE`、`UNSIGNED_AT_SOURCE`、`RECOMPUTATION_NOT_READY`、`EVIDENCE_NOT_RETAINED`（旧档无逐行依据，`missing` 给出缺项，`restored_by=recomputed` 表示已由复算补足依据）、`SOURCE_UNAVAILABLE`、`SOURCE_CHANGED`、`RECOMPUTE_FAILED`。
+
+复核不允许产生正式批次：若同一原件与参数已有异规正式 `runs` 批次，`POST /api/review/runs` 返回 `409 RULE_MIGRATION_REQUIRED` 并指向复核接口。复核册存于独立 `rechecks` 表，`recheck_id` 由源标识、源规则版本、现行规则版本、原件摘要与参数生成，重复生成返回原册。复核结论不是签审记录，也不得回填到源批次的 `signatures`。

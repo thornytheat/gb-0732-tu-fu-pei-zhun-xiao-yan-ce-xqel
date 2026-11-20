@@ -8,7 +8,7 @@
 docker compose up --build
 ```
 
-打开 `http://localhost:18421/`，选「河西四幅 · 外业原件」并点击「运行校验」。图幅索引可切换到单幅，拼缝索引可展开逐站偏差。左栏各章可预检样例，也可查看已运行批次的证据。保持参数不变，点击「重跑校验」复用同一批次。工具条提供打印册页与 JSON 证据下载。
+打开 `http://localhost:18421/`，选「河西四幅 · 外业原件」并点击「运行校验」。图幅索引可切换到单幅，拼缝索引可展开逐站偏差。左栏各章可预检样例，也可查看已运行批次的证据。保持参数不变，点击「重跑校验」复用同一批次。左栏「规则迁移复核」可为旧规则批次生成一册其复核：逐幅并列旧结论、现规则复算、原签审与待补原因，可导出复核册。工具条提供打印册页与 JSON 证据下载。
 
 ```bash
 docker compose exec -T app pytest -q
@@ -37,8 +37,9 @@ Compose 将批次与签审保存到 `register-data` 命名卷。需要空册时�
 | 离群重估 | `GET /api/refit` | 阈值内多数点拟合、稳定复估、保留离群依据 |
 | 接缝验核 | `GET /api/seams` | 复用筛查、证明覆盖与次序、贴边独立测距 |
 | 图幅签审 | `POST /api/review/runs` | 原件勾稽、图边签审判定、批次留存 |
+| 规则迁移复核 | `POST /api/review/migration/rechecks` | 旧批次按现规则只读复算、逐幅列可重验依据与待补原因 |
 
-预检入口接收 `dataset=field` 或 `dataset=reference`，以及可选的 `control_limit_m`、`seam_limit_m`。运行接口接收同名 JSON 字段。`GET /api/review/runs/{run_id}` 回读，`POST /api/review/runs/{run_id}/signatures` 对可签图幅录名，`GET /api/review/runs/{run_id}/export` 下载一份证据。接口目录在 `/docs`。
+预检入口接收 `dataset=field` 或 `dataset=reference`，以及可选的 `control_limit_m`、`seam_limit_m`。运行接口接收同名 JSON 字段。`GET /api/review/runs/{run_id}` 回读，`POST /api/review/runs/{run_id}/signatures` 对可签图幅录名，`GET /api/review/runs/{run_id}/export` 下载一份证据。规则迁移复核用 `GET /api/review/migration/sources` 列出可复核的旧批次（库内旧版本批次与 `sample_data/legacy/` 归档），`POST /api/review/migration/rechecks` 生成复核册，`GET /api/review/rechecks/{recheck_id}/export` 导出。接口目录在 `/docs`。
 
 默认原件包含一个高影响离群点、冲突重测及一幅共线退化图。河西和青石桥均可拟合，但两图之间的见证偏差超限；柳湾可以签审。校准副本的 48 个控制点采信、三条边通过，四幅均可签。
 

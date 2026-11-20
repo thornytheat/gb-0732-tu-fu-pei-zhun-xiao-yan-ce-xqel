@@ -1,0 +1,185 @@
+{
+  "format": "map-register/archive-1",
+  "manifest": {
+    "run_id": "b4bb3e0ca7ce860809040c03b56ebbfdcd3640bf3f40809a6d486201927c8f22",
+    "rule_version": "2019.03.01-r2",
+    "created_at": "2019-03-04T02:15:00.000+00:00",
+    "data_version": "HX-1978-R3",
+    "inputs": {
+      "catalog.json": "d7b3935118c43afbd451cf29ed24dc8c02559ac902fa284fe437f64febd8a395",
+      "pixels.csv": "26909beb068132d2461608ac4797c2cda191573dbe126e734e9ad452b52c1148",
+      "ground.csv": "97a3fe7641a99656f0bce4d10a8e195392b3a8586533e50936c898fbe8fd5088",
+      "witness.csv": "3d484c33916c43adf4372f38b7f580de2793947f032a4a8b2d7397888ceb7cfb"
+    },
+    "parameters": {
+      "dataset": "field",
+      "control_limit_m": 0.75,
+      "seam_limit_m": 1.5
+    }
+  },
+  "catalog": {
+    "title": "河西四幅接边检校",
+    "version": "HX-1978-R3",
+    "longitude_deg": 112.8,
+    "latitude_deg": 28.2,
+    "sheets": [
+      {
+        "code": "0421",
+        "title": "河西",
+        "width_px": 1200,
+        "height_px": 900
+      },
+      {
+        "code": "0422",
+        "title": "青石桥",
+        "width_px": 1200,
+        "height_px": 900
+      },
+      {
+        "code": "0431",
+        "title": "柳湾",
+        "width_px": 1200,
+        "height_px": 900
+      },
+      {
+        "code": "0432",
+        "title": "双井",
+        "width_px": 1200,
+        "height_px": 900
+      }
+    ],
+    "edges": [
+      {
+        "code": "HX-QS",
+        "a": "0421",
+        "b": "0422",
+        "a_side": "E",
+        "b_side": "W",
+        "reverse": false
+      },
+      {
+        "code": "HX-LW",
+        "a": "0421",
+        "b": "0431",
+        "a_side": "S",
+        "b_side": "N",
+        "reverse": false
+      },
+      {
+        "code": "QS-SJ",
+        "a": "0422",
+        "b": "0432",
+        "a_side": "S",
+        "b_side": "N",
+        "reverse": false
+      }
+    ],
+    "aliases": {
+      "河西旧一": "水准一",
+      "水准一": "P01",
+      "河堤四号": "P04"
+    }
+  },
+  "reviews": [
+    {
+      "code": "0421",
+      "title": "河西",
+      "status": "READY",
+      "reason": null,
+      "fit_rms_m": 0.0686305848,
+      "edges": [
+        "HX-QS",
+        "HX-LW"
+      ],
+      "failed_edges": [],
+      "blocked_edges": []
+    },
+    {
+      "code": "0422",
+      "title": "青石桥",
+      "status": "READY",
+      "reason": null,
+      "fit_rms_m": 0.0709123083,
+      "edges": [
+        "HX-QS",
+        "QS-SJ"
+      ],
+      "failed_edges": [],
+      "blocked_edges": []
+    },
+    {
+      "code": "0431",
+      "title": "柳湾",
+      "status": "READY",
+      "reason": null,
+      "fit_rms_m": 0.0709123298,
+      "edges": [
+        "HX-LW"
+      ],
+      "failed_edges": [],
+      "blocked_edges": []
+    },
+    {
+      "code": "0432",
+      "title": "双井",
+      "status": "HOLD",
+      "reason": "COLLINEAR_PIXELS",
+      "fit_rms_m": null,
+      "edges": [
+        "QS-SJ"
+      ],
+      "failed_edges": [],
+      "blocked_edges": [
+        "QS-SJ"
+      ]
+    }
+  ],
+  "signatures": [
+    {
+      "sheet": "0421",
+      "reviewer": "周测绘",
+      "signed_at": "2019-03-05T01:20:00+00:00",
+      "version": 1
+    },
+    {
+      "sheet": "0422",
+      "reviewer": "陈测绘",
+      "signed_at": "2019-03-05T01:34:00+00:00",
+      "version": 1
+    },
+    {
+      "sheet": "0431",
+      "reviewer": "周测绘",
+      "signed_at": "2019-03-05T01:41:00+00:00",
+      "version": 1
+    }
+  ],
+  "ledger": {
+    "controls": {
+      "input": 53,
+      "accepted": 35,
+      "outlier": 1,
+      "isolated": 17,
+      "blank": 1,
+      "repeated_headers": 1,
+      "balanced": true
+    },
+    "ground": {
+      "input": 49,
+      "paired": 43,
+      "isolated": 6,
+      "blank": 0,
+      "repeated_headers": 0,
+      "balanced": true
+    },
+    "witnesses": {
+      "input": 19,
+      "eligible": 18,
+      "isolated": 1,
+      "blank": 0,
+      "repeated_headers": 0,
+      "balanced": true
+    },
+    "reason_counts": {}
+  }
+}

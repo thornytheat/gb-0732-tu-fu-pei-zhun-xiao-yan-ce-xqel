@@ -4,6 +4,8 @@ export const labels = {
   PASS: '通过', FAIL: '超限', BLOCKED: '待核', FIT: '已拟合', READY: '可签', HOLD: '暂缓', RETURN: '退修',
   SIGNED: '已签', OUTLIER: '离群', ACCEPTED: '采信', RECEIVED: '已收',
   EMPTY_FILE: '空档', BLANK_FILE: '空行档', HEADER_ONLY: '仅表头',
+  AGREE: '结论一致', CHANGED: '结论改变', UNVERIFIABLE: '待补原件',
+  CURRENT: '现规则签审', STALE: '旧规签审·待补签', INVALIDATED: '旧规签审·失效', ABSENT: '未签审',
 };
 const reasons = JSON.parse(document.getElementById('reason-dictionary').textContent);
 const number = new Intl.NumberFormat('zh-CN', {minimumFractionDigits: 3, maximumFractionDigits: 3, useGrouping: false});
@@ -150,8 +152,56 @@ function review(root, snapshot) {
     width.map((entry, index) => [['控制点', '地面点', '拼缝见证'][index], entry.input, sums[index], badge('PASS')])));
 }
 
-export function renderLedger(root, section, {snapshot, preview, selected, edgeId, limit}) {
+function migration(root, data) {
+  if (!data) {
+    root.append(el('p', '选择左栏「规则迁移复核」后生成复核册。'));
+    return;
+  }
+  const summary = data.summary;
+  root.append(table([['旧批次'], ['源规则'], ['现行规则'], ['复算可重验'], ['原件状态'], ['生成时间']], [[
+    `${data.source.kind === 'archive' ? '归档' : '批次'} ${data.source.id.slice(0, 12)}`,
+    data.source.rule_version, data.rule_version,
+    String(data.sheets.filter(row => row.recomputed).length) + ' / ' + data.sheets.length,
+    data.source_state === 'MATCHED' ? '摘要相符' : data.source_state === 'CHANGED' ? '摘要不符' : '档件缺失',
+    data.created_at,
+  ]]));
+  root.append(el('p', data.note, 'caption'));
+  root.append(table([['图幅'], ['旧结论'], ['新口径复算'], ['对照'], ['原签审'], ['签审状态'], ['待补 / 待办']],
+    data.sheets.map(row => [
+      `${row.code} ${row.title}`,
+      row.legacy ? `${labels[row.legacy.status] || row.legacy.status}${row.legacy.reason ? ' · ' + reason(row.legacy.reason) : ''}` : '—',
+      row.recomputed ? `${labels[row.recomputed.status] || row.recomputed.status}${row.recomputed.reason ? ' · ' + reason(row.recomputed.reason) : ''}` : '无法复算',
+      badge(row.verdict),
+      row.signature ? `${row.signature.reviewer} · ${row.signature.signed_at}` : '—',
+      badge(row.signature_state),
+      row.pending.map(item => `${item.label}${item.detail && item.detail.missing ? `（缺 ${item.detail.missing.join('、')}）` : ''}`).join('；') || '—',
+    ])));
+  for (const row of data.sheets) {
+    group(root, `${row.code} ${row.title} · 可重验依据`, table([['依据'], ['来源'], ['内容']],
+      row.basis.map(item => [item.label, item.origin === 'archived' ? '旧证据' : item.origin === 'recomputed' ? '新复算' : '原件',
+        basisText(item)])));
+    group(root, `${row.code} ${row.title} · 待补 / 待办`, table([['原因'], ['说明'], ['细节']],
+      row.pending.map(item => [item.label, item.code,
+        item.detail ? Object.entries(item.detail).map(([key, value]) => `${key}=${Array.isArray(value) ? value.join('、') : value}`).join('；') : '—'])));
+  }
+}
+
+function basisText(item) {
+  if (item.kind === 'input') return `${item.file} · ${item.sha256 ? item.sha256.slice(0, 16) : '—'} · ${item.match ? '相符' : '不符'}`;
+  if (item.kind === 'controls') return `${item.accepted} 采信 / ${item.outlier} 离群 / ${item.isolated} 隔离 · ${item.accepted_sources.slice(0, 4).join('、')}${item.accepted_sources.length > 4 ? ' …' : ''}`;
+  if (item.kind === 'model') return `${item.status} · ${item.count} 点 · 均方根 ${fmt(item.rms_m)} m · 条件数 ${fmt(item.condition)}`;
+  if (item.kind === 'seam') return `${item.edge} · ${item.status} · ${item.count} 站 · 最大 ${fmt(item.max_m)} m · 限 ${fmt(item.limit_m)} m`;
+  if (item.kind === 'signature') return `${item.reviewer} · ${item.signed_at} · 版本 ${item.version} · 规则 ${item.rule_version}`;
+  if (item.kind === 'ledger') return item.balanced ? '三表行号多重集对账通过' : '对账未通过';
+  return '—';
+}
+
+export function renderLedger(root, section, {snapshot, preview, selected, edgeId, limit, recheck}) {
   root.replaceChildren();
+  if (section === 'migration') {
+    migration(root, recheck);
+    return;
+  }
   const value = preview || (section === 'review' ? snapshot : snapshot?.[section]);
   if (!value) {
     root.append(el('p', '运行校验后查看。'));

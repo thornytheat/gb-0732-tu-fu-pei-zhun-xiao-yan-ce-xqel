@@ -49,3 +49,18 @@
 | 19 条拼缝见证记录 | 18 可用 + 1 隔离 |
 
 空行和重复表头各一行，未纳入逻辑记录。对账比较源行号多重集，同计数但错行也会阻断。签审沿所有登记拼缝求判定，`HX-QS` 实测超限与 `QS-SJ` 缺模型分别留证。
+
+## 规则迁移复核
+
+| 模块 | 使用者动作 | 入口 | 核心文件 | 测试 |
+|---|---|---|---|---|
+| M8 规则迁移复核 | 旧批次按现规则复算，逐幅看可重验依据与待补原因 | `POST /api/review/migration/rechecks` | `app/modules/review/migration.py` `app/modules/review/archive.py` | `tests/test_migration.py` |
+
+| TRAP | 样例与现象 | 朴素实现会怎样 | 本项目处理 | 处理位置 | 测试 |
+|---|---|---|---|---|---|
+| TRAP-31 | `sample_data/legacy/hx-1978-r2.json` 旧规则下 0421、0422 曾签「可签」 | 沿用旧签审或把复算写成新签审 | 原签审只读留存，复算单列「旧规签审·待补签/失效」 | `app/modules/review/migration.py` | `tests/test_migration.py::test_archive_recheck_pairs_basis_with_pending_reasons` |
+| TRAP-32 | 旧批次原件仍在，同一原件再跑一次 | 按现规则另立第二条正式版本 | 已有异规正式批次时拒绝建批，指向迁移复核 | `app/modules/review/service.py` | `tests/test_migration.py::test_rerunning_a_legacy_batch_cannot_add_a_second_formal_version` |
+| TRAP-33 | 归档只留结论、无逐行输入 | 直接标「已复核通过」 | 依据与待补并列：摘要相符者按现规则复算补依据，原件缺失者标`EVIDENCE_NOT_RETAINED` | `app/modules/review/migration.py` `app/modules/review/archive.py` | `tests/test_migration.py::test_missing_source_keeps_legacy_outcome_and_names_the_gap` |
+| TRAP-34 | 复核前原件被改动 | 用现文件冒充旧批次复算 | 复算前后摘要都必须等于旧批次摘要，不符即 `SOURCE_CHANGED` | `app/modules/review/migration.py` | `tests/test_migration.py::test_changed_source_is_reported_instead_of_recomputed` |
+
+复核册只写独立 `rechecks` 表，不触碰 `runs` 与 `signatures`；`recheck_id` 由源批次、双方规则版本、原件摘要与参数生成，同一旧批次重复复核复用同一册。

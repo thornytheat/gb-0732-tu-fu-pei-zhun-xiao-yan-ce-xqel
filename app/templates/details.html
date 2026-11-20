@@ -7,4 +7,11 @@
     <button class="button primary" type="submit">签审入册</button>
     <p class="feedback" id="signature-error" role="alert" hidden></p>
   </form>
+  <form class="signature-form migration-form" id="migration-form" hidden>
+    <label>旧批次 <select id="migration-source" name="source"></select></label>
+    <button class="button primary" type="submit">生成复核册</button>
+    <a class="button outline" id="migration-export" aria-disabled="true">导出复核册</a>
+    <p class="feedback" id="migration-error" role="alert" hidden></p>
+    <p class="migration-note">只读复算：不改原件、不改旧签审、不另立正式批次；复算结论不能当作签审。</p>
+  </form>
 </section>

@@ -81,3 +81,5 @@ sup a { font: 10px var(--mono); padding-inline-start: 3px; color: var(--accent);
   .ledger th { position: static !important; }
   .signature-form, .caption { color: black; }
 }
+.migration-form { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: end; }
+.migration-form .migration-note { grid-column: 1 / -1; margin: 0; color: var(--ink-3); font-size: 11px; }

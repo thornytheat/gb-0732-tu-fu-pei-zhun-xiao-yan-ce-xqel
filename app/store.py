@@ -20,6 +20,13 @@ CREATE TABLE IF NOT EXISTS signatures (
     version INTEGER NOT NULL CHECK (version = 1),
     PRIMARY KEY (run_id, sheet)
 );
+CREATE TABLE IF NOT EXISTS rechecks (
+    recheck_id TEXT PRIMARY KEY,
+    source_kind TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    document TEXT NOT NULL
+);
 '''
 
 
@@ -62,6 +69,34 @@ class Store:
         with self.connect() as connection:
             return self._read(connection, run_id, required)
 
+    def find_prior_rule(self, inputs, parameters):
+        """Formal batches over identical inputs and parameters under another rule version."""
+        with self.connect() as connection:
+            rows = connection.execute('SELECT run_id, created_at, snapshot FROM runs').fetchall()
+        matches = []
+        for row in rows:
+            manifest = json.loads(row['snapshot'])['manifest']
+            if manifest['inputs'] == inputs and manifest['parameters'] == parameters:
+                matches.append({'run_id': row['run_id'], 'created_at': row['created_at'],
+                                'rule_version': manifest['rule_version']})
+        return sorted(matches, key=lambda item: item['created_at'])
+
+    def list_runs(self):
+        with self.connect() as connection:
+            rows = connection.execute('SELECT run_id, created_at, snapshot FROM runs ORDER BY created_at DESC').fetchall()
+        summaries = []
+        for row in rows:
+            snapshot = json.loads(row['snapshot'])
+            manifest = snapshot['manifest']
+            summaries.append({'run_id': row['run_id'], 'created_at': row['created_at'],
+                              'dataset': manifest['parameters']['dataset'],
+                              'parameters': manifest['parameters'],
+                              'rule_version': manifest['rule_version'],
+                              'data_version': manifest.get('data_version'),
+                              'sheets': [review['code'] for review in snapshot.get('reviews', [])],
+                              'signed': len(snapshot.get('signatures', []))})
+        return summaries
+
     def insert(self, snapshot):
         manifest = snapshot['manifest']
         run_id = manifest['run_id']
@@ -89,3 +124,29 @@ class Store:
             connection.execute('INSERT INTO signatures VALUES (?, ?, ?, ?, 1)',
                                (run_id, sheet, reviewer, signed_at))
             return {'sheet': sheet, 'reviewer': reviewer, 'signed_at': signed_at, 'version': 1}
+
+    def insert_recheck(self, document):
+        recheck_id = document['recheck_id']
+        source_kind, source_id = document['source_kind'], document['source_id']
+        serialized = canonical_json(document)
+        with self.connect('IMMEDIATE') as connection:
+            # The recheck volume is additive: it never rewrites the source batch or its signatures.
+            if source_kind == 'run':
+                self._read(connection, source_id)
+            insert = connection.execute(
+                'INSERT INTO rechecks VALUES (?, ?, ?, ?, ?) ON CONFLICT(recheck_id) DO NOTHING',
+                (recheck_id, source_kind, source_id, document['created_at'], serialized))
+            row = connection.execute('SELECT document FROM rechecks WHERE recheck_id = ?',
+                                     (recheck_id,)).fetchone()
+            return json.loads(row['document']), insert.rowcount == 0
+
+    def get_recheck(self, recheck_id, required=True):
+        with self.connect() as connection:
+            row = connection.execute('SELECT document FROM rechecks WHERE recheck_id = ?',
+                                     (recheck_id,)).fetchone()
+            if not row:
+                if required:
+                    raise RegisterError('RECHECK_NOT_FOUND', '未找到该复核册', 404)
+                return None
+            return json.loads(row['document'])
+
